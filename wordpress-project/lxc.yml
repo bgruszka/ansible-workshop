@@ -1,0 +1,81 @@
+---
+- hosts: all
+  vars:
+    containers:
+      - name: db1
+        service: database-servers
+      - name: web1
+        service: web-servers
+
+  tasks:
+    - name: Create containers
+      lxc_container:
+        name: "{{ item.name }}"
+        container_log: true
+        template: ubuntu
+        state: started
+        template_options: "--release xenial"
+      with_items: "{{ containers }}"
+      register: containers_info
+
+    - name: Wait for the network to be setup in the containers
+      when: containers_info|changed
+      pause: seconds=10
+
+    - name: Get containers info now that IPs are available
+      lxc_container:
+        name: "{{ item.name }}"
+      with_items: "{{ containers }}"
+      register: containers_info
+
+    - name: debug containers
+      debug: var=containers_info
+
+    - name: Install Python 2
+      lxc_container:
+        name: "{{ item.name }}"
+        container_command: test -e /usr/bin/python || (apt-get update && apt-get install -y python)
+      with_items: "{{ containers }}"
+
+    - name: Create .ssh directory for root in VM
+      file: path=/var/lib/lxc/{{ item.name }}/rootfs/root/.ssh state=directory owner=root group=root mode=0700
+      with_items: "{{ containers }}"
+
+
+    - name: Create .ssh directory
+      file: path=/var/lib/lxc/{{ item.name }}/rootfs/home/ubuntu/.ssh state=directory owner=1000 group=1000 mode=0700
+      with_items: "{{ containers }}"
+
+
+    - name: Create authorized_keys files in VM for root
+      file: path=/var/lib/lxc/{{ item.name }}/rootfs/root/.ssh/authorized_keys state=touch owner=root group=root mode=0600
+      with_items: "{{ containers }}"
+
+
+    - name: Create authorized_keys files in VM for ubuntu
+      file: path=/var/lib/lxc/{{ item.name }}/rootfs/home/ubuntu/.ssh/authorized_keys state=touch owner=1000 group=1000 mode=0600
+      with_items: "{{ containers }}"
+
+    - name: Add host ssh key to VM - root -> root
+      shell: cat /root/.ssh/id_rsa.pub >> /var/lib/lxc/{{ item.name }}/rootfs/root/.ssh/authorized_keys
+      with_items: "{{ containers }}"
+
+
+    - name: Add host ssh key to VM - root -> ubuntu
+      shell: cat /root/.ssh/id_rsa.pub >> /var/lib/lxc/{{ item.name }}/rootfs/home/ubuntu/.ssh/authorized_keys
+      with_items: "{{ containers }}"
+
+    - name: Add mappings to /etc/ansible/hosts
+      blockinfile:
+        dest: /etc/ansible/hosts
+        marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.item.service }}"
+        block: |
+          [{{ item.item.service }}]
+          {{ item.lxc_container.ips.0 }}
+      with_items: "{{ containers_info.results }}"
+
+    # - name: Remove containers
+    #   lxc_container:
+    #     name: "{{ item.name }}"
+    #     state: absent
+    #   with_items: "{{ containers }}"

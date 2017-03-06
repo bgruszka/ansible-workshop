@@ -1,0 +1,14 @@
+---
+- name: Database Setup
+  hosts: database-servers
+  remote_user: root
+  roles:
+    - common
+    - database
+
+- name: Webserver Setup
+  hosts: web-servers
+  remote_user: root
+  roles:
+    - common
+    - web

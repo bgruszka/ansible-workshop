@@ -1,0 +1,35 @@
+---
+- name: DATABASE | Install MySQL
+  package:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - mysql-server-5.7
+    - mysql-client-5.7
+    - libmysqlclient-dev
+    - python-pip
+
+- name: DATABASE | Install pip packages
+  pip:
+    name: mysql-python
+
+- name: Listen on all interfaces
+  replace:
+    dest: /etc/mysql/mysql.conf.d/mysqld.cnf
+    regexp: '127.0.0.1'
+    replace: '0.0.0.0'
+  notify: restart mysql
+
+- name: DATABASE | Create a new database with name '{{ db_name }}'
+  mysql_db:
+    name: "{{ db_name }}"
+    state: present
+
+- name: DATABASE | Create new database user
+  mysql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    priv: '{{ db_name }}.*:ALL'
+    host: "{{ item }}"
+    state: present
+  with_items: "{{ groups['web-servers'] }}"
