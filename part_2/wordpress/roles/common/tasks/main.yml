@@ -1,6 +1,0 @@
-- name: Install tools
-  package:
-    name: "{{ item }}"
-  with_items:
-    - vim
-    - curl
