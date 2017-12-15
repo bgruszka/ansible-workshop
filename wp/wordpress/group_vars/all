@@ -3,5 +3,5 @@ db_host: "{{ groups['database-servers'][0] }}"
 db_user: wordpress
 db_password: wordpress
 
-wordpress_domain: wordpress.dev
+wordpress_domain: wordpress.local
 wordpress_web_root: /web/wordpress
